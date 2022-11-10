@@ -32,48 +32,69 @@ from solacc.companion import NotebookSolutionCompanion
 
 # COMMAND ----------
 
+cluster_json = {
+    "num_workers": 8,
+    "cluster_name": "jsl_kg_cluster",
+    "spark_version": "9.1.x-cpu-ml-scala2.12", # This needs to match JSL version in partner connect
+    "spark_conf": {
+        "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+        "spark.kryoserializer.buffer.max": "2000M",
+        "spark.databricks.delta.formatCheck.enabled": "false"
+    },
+    "node_type_id": {"AWS": "i3.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"}, # different from standard API; this is multi-cloud friendly
+    "autotermination_minutes": 120
+}
+
+# COMMAND ----------
+
+nsc = NotebookSolutionCompanion()
+cluster_id = nsc.create_or_update_cluster_by_name(nsc.customize_cluster_json(cluster_json))
+
+# COMMAND ----------
+
+task_json = {'tasks': [{
+    'task_key': 'setup_cluster',
+    'depends_on': [],
+    'existing_cluster_id': cluster_id,
+    "notebook_task": {
+        "notebook_path": "/Shared/John Snow Labs/Install JohnSnowLabs NLP",
+        "source": "WORKSPACE"
+        },
+    'timeout_seconds': 86400}]
+            }
+nsc.submit_run(task_json)
+
+# COMMAND ----------
+
 job_json = {
-        "timeout_seconds": 28800,
+        "timeout_seconds": 7200,
         "max_concurrent_runs": 1,
         "tags": {
             "usage": "solacc_testing",
-            "group": "SOLACC"
+            "group": "HLS"
         },
         "tasks": [
             {
-                "job_cluster_key": "sample_solacc_cluster",
+                "existing_cluster_id": cluster_id,
                 "notebook_task": {
-                    "notebook_path": f"01_Introduction_And_Setup"
+                    "notebook_path": "01-jsl-entity-extraction"
                 },
-                "task_key": "sample_solacc_01"
+                "task_key": "jsl_kg_01",
+                "description": ""
             },
             {
-                "job_cluster_key": "sample_solacc_cluster",
+                "existing_cluster_id": cluster_id,
+                "libraries": [],
                 "notebook_task": {
-                    "notebook_path": f"02_Analysis"
+                    "notebook_path": "02-knowledge-graph"
                 },
-                "task_key": "sample_solacc_02",
+                "task_key": "jsl_kg_02",
+                "description": "",
                 "depends_on": [
                     {
-                        "task_key": "sample_solacc_01"
+                        "task_key": "jsl_kg_01"
                     }
                 ]
-            }
-        ],
-        "job_clusters": [
-            {
-                "job_cluster_key": "sample_solacc_cluster",
-                "new_cluster": {
-                    "spark_version": "10.4.x-cpu-ml-scala2.12",
-                "spark_conf": {
-                    "spark.databricks.delta.formatCheck.enabled": "false"
-                    },
-                    "num_workers": 2,
-                    "node_type_id": {"AWS": "i3.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
-                    "custom_tags": {
-                        "usage": "solacc_testing"
-                    },
-                }
             }
         ]
     }
@@ -82,4 +103,12 @@ job_json = {
 
 dbutils.widgets.dropdown("run_job", "False", ["True", "False"])
 run_job = dbutils.widgets.get("run_job") == "True"
-NotebookSolutionCompanion().deploy_compute(job_json, run_job=run_job)
+nsc.deploy_compute(job_json, run_job=run_job, wait=3600)
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
+
+

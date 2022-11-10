@@ -9,11 +9,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install neo4j
-
-# COMMAND ----------
-
-# MAGIC %pip install tqdm
+# MAGIC %pip install neo4j tqdm
 
 # COMMAND ----------
 
@@ -91,10 +87,16 @@ class Neo4jConnection:
 
 # COMMAND ----------
 
-# DBTITLE 1,create connection
-uri = '<your uri for neo4j connection>' 
-pwd = '<your password>'
-user = '<your use>'
+# MAGIC %md Here we created a [free testing instance of AuraDB](https://neo4j.com/cloud/aura-free/) using our own account and saved the credentials into a Databricks secret scope. ([AWS](https://docs.databricks.com/security/secrets/secret-scopes.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/secret-scopes), [GCP](https://docs.gcp.databricks.com/security/secrets/secrets.html)). 
+# MAGIC 
+# MAGIC The secret scope used in our internal testing is not available in all Databricks workspaces. Please set up your own credentials before proceeding with this accelerator. 
+
+# COMMAND ----------
+
+# DBTITLE 1,Create Connection
+uri = dbutils.secrets.get("solution-accelerator-cicd","neo4j-uri") # replace with '<Neo4j Aura instance uri>' or set up this secret in your own workspace
+pwd = dbutils.secrets.get("solution-accelerator-cicd","neo4j-password") # replace with '<Neo4j Aura instance password>' or set up this secret in your own workspace
+user = dbutils.secrets.get("solution-accelerator-cicd","neo4j-user") # replace with '<Neo4j Aura instance user>' or set up this secret in your own workspace
 
 conn = Neo4jConnection(uri=uri, user=user , pwd=pwd)
 
@@ -106,15 +108,15 @@ conn = Neo4jConnection(uri=uri, user=user , pwd=pwd)
 
 # COMMAND ----------
 
-conn.query('CREATE CONSTRAINT patients IF NOT EXISTS ON (p:Patient) ASSERT p.name IS UNIQUE;')
-conn.query('CREATE CONSTRAINT rx_norm_codes IF NOT EXISTS ON (rx:RxNorm) ASSERT rx.code IS UNIQUE;')
-conn.query('CREATE CONSTRAINT drugs IF NOT EXISTS ON (drug:Drug) ASSERT drug.name IS UNIQUE;')
-conn.query('CREATE CONSTRAINT ners IF NOT EXISTS ON (n:NER) ASSERT n.name IS UNIQUE;')
-conn.query('CREATE CONSTRAINT symptoms IF NOT EXISTS ON (s:Symptom) ASSERT s.name IS UNIQUE;')
-conn.query('CREATE CONSTRAINT bodyParts IF NOT EXISTS ON (bp:BodyPart) ASSERT bp.name IS UNIQUE;')
-conn.query('CREATE CONSTRAINT procedures IF NOT EXISTS ON (p:Procedure) ASSERT p.name IS UNIQUE;')
-conn.query('CREATE CONSTRAINT tests IF NOT EXISTS ON (t:Test) ASSERT t.name IS UNIQUE;')
-conn.query('CREATE CONSTRAINT dsds IF NOT EXISTS ON (dsd:DSD) ASSERT dsd.name IS UNIQUE;')
+conn.query('CREATE CONSTRAINT patients IF NOT EXISTS FOR (p:Patient) REQUIRE p.name IS UNIQUE;')
+conn.query('CREATE CONSTRAINT rx_norm_codes IF NOT EXISTS FOR (rx:RxNorm) REQUIRE rx.code IS UNIQUE;')
+conn.query('CREATE CONSTRAINT drugs IF NOT EXISTS FOR (drug:Drug) REQUIRE drug.name IS UNIQUE;')
+conn.query('CREATE CONSTRAINT ners IF NOT EXISTS FOR (n:NER) REQUIRE n.name IS UNIQUE;')
+conn.query('CREATE CONSTRAINT symptoms IF NOT EXISTS FOR (s:Symptom) REQUIRE s.name IS UNIQUE;')
+conn.query('CREATE CONSTRAINT bodyParts IF NOT EXISTS FOR (bp:BodyPart) REQUIRE bp.name IS UNIQUE;')
+conn.query('CREATE CONSTRAINT procedures IF NOT EXISTS FOR (p:Procedure) REQUIRE p.name IS UNIQUE;')
+conn.query('CREATE CONSTRAINT tests IF NOT EXISTS FOR (t:Test) REQUIRE t.name IS UNIQUE;')
+conn.query('CREATE CONSTRAINT dsds IF NOT EXISTS FOR (dsd:DSD) REQUIRE dsd.name IS UNIQUE;')
 
 # COMMAND ----------
 
@@ -571,3 +573,7 @@ df
 # MAGIC %md
 # MAGIC ## Disclaimers
 # MAGIC Databricks Inc. (“Databricks”) does not dispense medical, diagnosis, or treatment advice. This Solution Accelerator (“tool”) is for informational purposes only and may not be used as a substitute for professional medical advice, treatment, or diagnosis. This tool may not be used within Databricks to process Protected Health Information (“PHI”) as defined in the Health Insurance Portability and Accountability Act of 1996, unless you have executed with Databricks a contract that allows for processing PHI, an accompanying Business Associate Agreement (BAA), and are running this notebook within a HIPAA Account.  Please note that if you run this notebook within Azure Databricks, your contract with Microsoft applies.
+
+# COMMAND ----------
+
+
