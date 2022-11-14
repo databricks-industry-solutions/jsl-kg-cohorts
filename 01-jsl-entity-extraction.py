@@ -78,7 +78,7 @@ display(dbutils.fs.ls(f'{notes_path}/'))
 
 # DBTITLE 1,ingest data
 df = spark.createDataFrame(pd.read_csv(f'/dbfs{notes_path}/data.csv', sep=';'))
-df.display()
+df.limit(20).display()
 
 # COMMAND ----------
 
@@ -204,7 +204,7 @@ result_df = results.select('subject_id','date',F.explode(F.arrays_zip(results.po
                                                F.expr("cols['1']['entity2_end']").alias("entity2_end"),
                                                F.expr("cols['1']['chunk2']").alias("chunk2"),
                                                F.expr("cols['1']['confidence']").alias("confidence"))
-result_df.display()
+result_df.limit(20).display()
 
 # COMMAND ----------
 
@@ -267,13 +267,13 @@ rxnorm_result = rxnorm_results.select('subject_id','date', 'relation', 'entity1'
                                              F.expr("cols['2']").alias('rxnorm_code'),
                                              F.expr("cols['3']['all_k_results']").alias("all_codes"),
                                              F.expr("cols['3']['all_k_resolutions']").alias("resolutions"))
-rxnorm_result.display()
+rxnorm_result.limit(20).display()
 
 # COMMAND ----------
 
 rxnorm_result = rxnorm_result.withColumn('all_codes', F.split(F.col('all_codes'), ':::'))\
                              .withColumn('resolutions', F.split(F.col('resolutions'), ':::'))
-rxnorm_result.display()
+rxnorm_result.limit(20).display()
 
 # COMMAND ----------
 
@@ -366,7 +366,7 @@ result_df = results.select('subject_id','date',
                             F.expr("cols['2']").alias("end"),
                             F.expr("cols['3']['entity']").alias("ner_label"))\
                     .filter("ner_label!='O'")
-result_df.display()
+result_df.limit(20).display()
 
 # COMMAND ----------
 
