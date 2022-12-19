@@ -103,11 +103,14 @@ class Neo4jConnection:
 
 # Credentials for Neo4j graph database
 
-uri = dbutils.secrets.get("solution-accelerator-cicd","neo4j-uri") # replace with '<Neo4j Aura instance uri>' or set up this secret in your own workspace
+#uri = dbutils.secrets.get("solution-accelerator-cicd","neo4j-uri") # replace with '<Neo4j Aura instance uri>' or set up this secret in your own workspace
+uri = 'neo4j+s://bd09e1d1.databases.neo4j.io'
 
-pwd = dbutils.secrets.get("solution-accelerator-cicd","neo4j-password") # replace with '<Neo4j Aura instance password>' or set up this secret in your own workspace
+#pwd = dbutils.secrets.get("solution-accelerator-cicd","neo4j-password") # replace with '<Neo4j Aura instance password>' or set up this secret in your own workspace
+pwd = 'UWQgHCI7P-R-OUtEVAB2-sLMhdjsKtjbWalJgNl6fyc'
 
-user = dbutils.secrets.get("solution-accelerator-cicd","neo4j-user") # replace with '<Neo4j Aura instance user>' or set up this secret in your own workspace
+#user = dbutils.secrets.get("solution-accelerator-cicd","neo4j-user") # replace with '<Neo4j Aura instance user>' or set up this secret in your own workspace
+user='neo4j'
 
 # Establish the connection with Neo4j GDB
 conn = Neo4jConnection(uri=uri, user=user , pwd=pwd)
