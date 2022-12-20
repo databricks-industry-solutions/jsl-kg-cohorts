@@ -1,11 +1,20 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC #Patient Cohort Building with NLP and Knowledge Graphs: Knowledge Graph
+# MAGIC # Patient Cohort Building with NLP and Knowledge Graphs
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC In this notebook, we will build a Neo4j Clinical Knowledge Graph (KG) from the output of a Spark NLP pipeline that contains NER (named entity recognition) and RE (relation extraction) pretrained models. After creating the knowledge graph, we will query the KG to get some insightful results.
 # MAGIC 
-# MAGIC In this notebook, we use entities and their relationships, extracted in the previous section, to construct a knowledge graph and query the resulting knowledge graph, to:
-# MAGIC    - Perfrom patient-level retrieval of information to construct a full view of the patient's journey over time
-# MAGIC    - Create patient cohorts based on specific drug exposure within a given timeframe, procedures, or symptoms experienced. 
-# MAGIC    - Identify dangerous drug combinations 
+# MAGIC To obtain the visualizations included below, run the provided queries (just the query, without quotation marks) in Neo4j Browser. This can be accessed from the Instances screen in Neo4j via the `>_ Query` tab. The password for the instance is required to access the graph database. 
+# MAGIC 
+# MAGIC Please notice that the nodes and the relations color codes might differ from the ones provided here, as they depend on the individual browser settings. Also, you may obtain slightly different outputs, these are related to the versions of the pretrained models used in the Spark NLP pipelines.  
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC [Cluster Setup](https://nlp.johnsnowlabs.com/docs/en/licensed_install#install-on-databricks)
 
 # COMMAND ----------
 
@@ -24,6 +33,7 @@
 # COMMAND ----------
 
 from neo4j import GraphDatabase
+
 import time
 from tqdm import tqdm
 import pandas as pd
@@ -87,24 +97,19 @@ class Neo4jConnection:
 
 # COMMAND ----------
 
-# MAGIC %md Here we created a [free testing instance of AuraDB](https://neo4j.com/cloud/aura-free/) using our own account and saved the credentials into a Databricks secret scope. ([AWS](https://docs.databricks.com/security/secrets/secret-scopes.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/secret-scopes), [GCP](https://docs.gcp.databricks.com/security/secrets/secrets.html)). 
-# MAGIC 
-# MAGIC The secret scope used in our internal testing is not available in all Databricks workspaces. Please set up your own credentials before proceeding with this accelerator. 
+# Credentials for Neo4j graph database
 
-# COMMAND ----------
-
-# DBTITLE 1,Create Connection
 uri = dbutils.secrets.get("solution-accelerator-cicd","neo4j-uri") # replace with '<Neo4j Aura instance uri>' or set up this secret in your own workspace
 pwd = dbutils.secrets.get("solution-accelerator-cicd","neo4j-password") # replace with '<Neo4j Aura instance password>' or set up this secret in your own workspace
 user = dbutils.secrets.get("solution-accelerator-cicd","neo4j-user") # replace with '<Neo4j Aura instance user>' or set up this secret in your own workspace
 
+# Establish the connection with Neo4j GDB
 conn = Neo4jConnection(uri=uri, user=user , pwd=pwd)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Creating constrains
-# MAGIC We set up constrains to ensure data integrity. See https://neo4j.com/docs/cypher-manual/current/constraints/ for more information
+# MAGIC **Creating constraints:**
 
 # COMMAND ----------
 
@@ -121,8 +126,7 @@ conn.query('CREATE CONSTRAINT dsds IF NOT EXISTS FOR (dsd:DSD) REQUIRE dsd.name 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Defining helper functions:
-# MAGIC In the following cells we create helper functions for 
+# MAGIC **defining helper functions:**
 
 # COMMAND ----------
 
@@ -312,6 +316,14 @@ df_relationships
 
 # COMMAND ----------
 
+# To get the following visualization run the query in the Neo4j Browser
+query_string = '''
+CALL db.schema.visualization()
+'''
+
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC <img src="https://raw.githubusercontent.com/iamvarol/blogposts/main/databricks/images/db_viz.png">
 
@@ -380,6 +392,23 @@ df
 
 # COMMAND ----------
 
+# To get the following visualization, run the query in the Neo4j Browser
+
+query_string = '''
+  MATCH (p:Patient)
+  WHERE p.name = 21153
+
+  CALL apoc.path.subgraphAll(p, {
+      relationshipFilter: "RXNORM_CODE>|DRUG_GENERIC",
+                minLevel: 0,
+                maxLevel: 3
+                })
+   YIELD nodes, relationships
+   RETURN nodes, relationships;
+   '''
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC <img src="https://raw.githubusercontent.com/iamvarol/blogposts/main/databricks/images/patients_journey.png">
 
@@ -435,6 +464,22 @@ df
 
 # COMMAND ----------
 
+# To obtain the visualization below run the query in Neo4j Browser:
+
+query_string = '''
+  MATCH (p:Patient)-[rel_rx]->(rx:RxNorm)-[rel_d]->(d:Drug)-[rel_n:DRUG]->(n:NER)
+  WHERE d.name IN ['lasix']
+      AND rel_n.patient_name=p.name
+      AND rel_n.date=rel_rx.date 
+      AND rel_rx.date >= date("2060-05-01")
+      AND rel_n.date >= date("2060-05-01")
+      AND rel_rx.date < date("2125-05-01")
+      AND rel_n.date < date("2125-05-01")
+  RETURN d, rel_rx, rx, rel_d, rel_n, p, n;
+  '''
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC <img src="https://raw.githubusercontent.com/iamvarol/blogposts/main/databricks/images/lasix.png">
 
@@ -484,6 +529,20 @@ RETURN DISTINCT patients,
 
 df = pd.DataFrame([dict(_) for _ in conn.query(query_string)])
 df
+
+# COMMAND ----------
+
+# To obtain the visualization below, run the following query in Neo4j Browser:
+
+query_string = '''
+    WITH ["ibuprofen", "naproxen", "diclofenac", "indometacin", "ketorolac", "aspirin", "ketoprofen", "dexketoprofen", "meloxicam"] AS nsaids
+    MATCH (p:Patient)-[r1:RXNORM_CODE]->(rx:RxNorm)-[r2]->(d:Drug)
+    WHERE any(word IN nsaids WHERE d.name CONTAINS word) 
+    WITH DISTINCT p.name as patients, COLLECT(DISTINCT d.name) as nsaid_drugs, COUNT(DISTINCT d.name) as num_nsaids
+    MATCH (p:Patient)-[r1:RXNORM_CODE]->(rx:RxNorm)-[r2]->(d:Drug)
+    WHERE p.name=patients AND d.name CONTAINS 'warfarin'
+    RETURN p, rx, d, r1, r2;
+    '''
 
 # COMMAND ----------
 
@@ -539,6 +598,17 @@ df
 
 # COMMAND ----------
 
+# To obtain the visualization below, run the following query in Neo4j Browser:
+
+query_string = '''
+  MATCH (p:Patient)-[r:IS_SYMPTOM]->(s:Symptom),
+  (p1:Patient)-[r2:IS_DSD]->(_dsd:DSD)
+  WHERE s.name CONTAINS "chest pain" AND p1.name=p.name AND _dsd.name IN ['hypertension', 'diabetes'] AND r2.date=r.date
+  RETURN DISTINCT p, r, _dsd, s;
+  '''
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC <img src="https://raw.githubusercontent.com/iamvarol/blogposts/main/databricks/images/chest_pain.png">
 
@@ -573,7 +643,3 @@ df
 # MAGIC %md
 # MAGIC ## Disclaimers
 # MAGIC Databricks Inc. (“Databricks”) does not dispense medical, diagnosis, or treatment advice. This Solution Accelerator (“tool”) is for informational purposes only and may not be used as a substitute for professional medical advice, treatment, or diagnosis. This tool may not be used within Databricks to process Protected Health Information (“PHI”) as defined in the Health Insurance Portability and Accountability Act of 1996, unless you have executed with Databricks a contract that allows for processing PHI, an accompanying Business Associate Agreement (BAA), and are running this notebook within a HIPAA Account.  Please note that if you run this notebook within Azure Databricks, your contract with Microsoft applies.
-
-# COMMAND ----------
-
-
